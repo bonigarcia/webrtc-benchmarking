@@ -14,10 +14,9 @@
  */
 package io.bonigarcia.webrtc;
 
-import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Date;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.Test;
@@ -53,28 +52,25 @@ public class WebRtcOne2OneTest extends FunctionalTest {
 
   @Test
   public void tesOne2One() throws Exception {
-    // Media Pipeline
+    // Media pipeline
     MediaPipeline mp = kurentoClient.createMediaPipeline();
     WebRtcEndpoint masterWebRtcEp = new WebRtcEndpoint.Builder(mp).build();
-
-    // Viewer WebRtcEndpoint
     WebRtcEndpoint viewerWebRtcEP = new WebRtcEndpoint.Builder(mp).build();
     masterWebRtcEp.connect(viewerWebRtcEP);
 
     // Sync presenter and viewer time
     WebRtcTestPage[] browsers = { getPresenter(), getViewer() };
     String[] videoTags = { VideoTagType.LOCAL.getId(), VideoTagType.REMOTE.getId() };
-    syncTimeForOcr(browsers, videoTags);
+    String[] peerConnections = { "webRtcPeer.peerConnection", "webRtcPeer.peerConnection" };
+    syncTimeForOcr(browsers, videoTags, peerConnections);
 
-    // Presenter playing event
+    // Subscribe to playing event (presenter/viewer)
     getPresenter().subscribeLocalEvents("playing");
     getPresenter().initWebRtc(masterWebRtcEp, WebRtcChannel.AUDIO_AND_VIDEO, WebRtcMode.SEND_ONLY);
 
-    // Viewer playing event
     getViewer().subscribeEvents("playing");
     getViewer().initWebRtc(viewerWebRtcEP, WebRtcChannel.AUDIO_AND_VIDEO, WebRtcMode.RCV_ONLY);
 
-    // Wait for events
     getPresenter().waitForEvent("playing");
     getViewer().waitForEvent("playing");
 
@@ -85,31 +81,25 @@ public class WebRtcOne2OneTest extends FunctionalTest {
     // Guard time to play the video
     waitSeconds(PLAYTIME);
 
-    // Get OCR results
+    // Get OCR results and stas
     Map<String, String> presenterOcr = getPresenter().getOcr();
     Map<String, String> viewerOcr = getViewer().getOcr();
 
-    // Finish OCR
+    List<Map<String, String>> presenterStats = getPresenter().getStatsList();
+    List<Map<String, String>> viewerStats = getViewer().getStatsList();
+
+    // Finish OCR, close browser, release media pipeline
     getPresenter().endOcr();
     getViewer().endOcr();
 
-    // Process data
-    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("H:mm:ss:S");
-    for (String key : presenterOcr.keySet()) {
-      String matchKey = containSimilarDate(key, viewerOcr.keySet());
-      if (matchKey != null) {
-        Date presenterDater = simpleDateFormat.parse(ocr(presenterOcr.get(key)));
-        Date viewerDater = simpleDateFormat.parse(ocr(viewerOcr.get(matchKey)));
-        long latency = presenterDater.getTime() - viewerDater.getTime();
-        log.info("---------------> LATENCY {}", latency);
-      }
-    }
+    getPresenter().close();
+    getViewer().close();
 
-    log.info("Presenter OCR {} : {}", presenterOcr.size(), presenterOcr.keySet());
-    log.info("Viewer OCR {} : {}", viewerOcr.size(), viewerOcr.keySet());
-
-    // Release Media Pipeline
     mp.release();
+
+    // Process data and write CSV
+    processOcrDataToCsv(this.getClass().getSimpleName() + ".csv", presenterOcr, viewerOcr,
+        presenterStats, viewerStats);
   }
 
 }
