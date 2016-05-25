@@ -37,11 +37,10 @@ import org.kurento.test.latency.VideoTagType;
 
 public class WebRtcOne2OneTest extends FunctionalTest {
 
-  private static final int PLAYTIME = 10; // seconds to play in WebRTC
+  private static final int PLAYTIME_SEC = 10;
 
   @Parameters(name = "{index}: {0}")
   public static Collection<Object[]> data() {
-    // Test: Chrome in local (presenter and viewer)
     TestScenario test = new TestScenario();
     test.addBrowser(BrowserConfig.PRESENTER, new Browser.Builder().webPageType(WebPageType.WEBRTC)
         .browserType(BrowserType.CHROME).scope(BrowserScope.LOCAL).build());
@@ -54,9 +53,9 @@ public class WebRtcOne2OneTest extends FunctionalTest {
   public void tesOne2One() throws Exception {
     // Media pipeline
     MediaPipeline mp = kurentoClient.createMediaPipeline();
-    WebRtcEndpoint masterWebRtcEp = new WebRtcEndpoint.Builder(mp).build();
+    WebRtcEndpoint presenterWebRtcEp = new WebRtcEndpoint.Builder(mp).build();
     WebRtcEndpoint viewerWebRtcEP = new WebRtcEndpoint.Builder(mp).build();
-    masterWebRtcEp.connect(viewerWebRtcEP);
+    presenterWebRtcEp.connect(viewerWebRtcEP);
 
     // Sync presenter and viewer time
     WebRtcTestPage[] browsers = { getPresenter(), getViewer() };
@@ -66,11 +65,10 @@ public class WebRtcOne2OneTest extends FunctionalTest {
 
     // Subscribe to playing event (presenter/viewer)
     getPresenter().subscribeLocalEvents("playing");
-    getPresenter().initWebRtc(masterWebRtcEp, WebRtcChannel.AUDIO_AND_VIDEO, WebRtcMode.SEND_ONLY);
-
+    getPresenter().initWebRtc(presenterWebRtcEp, WebRtcChannel.AUDIO_AND_VIDEO,
+        WebRtcMode.SEND_ONLY);
     getViewer().subscribeEvents("playing");
     getViewer().initWebRtc(viewerWebRtcEP, WebRtcChannel.AUDIO_AND_VIDEO, WebRtcMode.RCV_ONLY);
-
     getPresenter().waitForEvent("playing");
     getViewer().waitForEvent("playing");
 
@@ -78,23 +76,20 @@ public class WebRtcOne2OneTest extends FunctionalTest {
     getPresenter().startOcr();
     getViewer().startOcr();
 
-    // Guard time to play the video
-    waitSeconds(PLAYTIME);
+    // Play video
+    waitSeconds(PLAYTIME_SEC);
 
-    // Get OCR results and stas
+    // Get OCR results and statistics
     Map<String, String> presenterOcr = getPresenter().getOcr();
     Map<String, String> viewerOcr = getViewer().getOcr();
-
     List<Map<String, String>> presenterStats = getPresenter().getStatsList();
     List<Map<String, String>> viewerStats = getViewer().getStatsList();
 
     // Finish OCR, close browser, release media pipeline
     getPresenter().endOcr();
     getViewer().endOcr();
-
     getPresenter().close();
     getViewer().close();
-
     mp.release();
 
     // Process data and write CSV
