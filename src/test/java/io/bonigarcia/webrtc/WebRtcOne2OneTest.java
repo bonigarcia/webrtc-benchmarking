@@ -16,7 +16,6 @@ package io.bonigarcia.webrtc;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.Test;
@@ -80,10 +79,12 @@ public class WebRtcOne2OneTest extends FunctionalTest {
     waitSeconds(PLAYTIME_SEC);
 
     // Get OCR results and statistics
-    Map<String, String> presenterOcr = getPresenter().getOcr();
-    Map<String, String> viewerOcr = getViewer().getOcr();
-    List<Map<String, String>> presenterStats = getPresenter().getStatsList();
-    List<Map<String, String>> viewerStats = getViewer().getStatsList();
+    Map<String, Map<String, String>> presenterMap = getPresenter().getOcrMap();
+    Map<String, Map<String, String>> viewerMap = getViewer().getOcrMap();
+
+    // Serialize data
+    serializeObject(presenterMap, "presenter.ser");
+    serializeObject(viewerMap, "viewer.ser");
 
     // Finish OCR, close browser, release media pipeline
     getPresenter().endOcr();
@@ -93,8 +94,7 @@ public class WebRtcOne2OneTest extends FunctionalTest {
     mp.release();
 
     // Process data and write CSV
-    processOcrDataToCsv(this.getClass().getSimpleName() + ".csv", presenterOcr, viewerOcr,
-        presenterStats, viewerStats);
+    processDataToCsv(this.getClass().getSimpleName() + ".csv", presenterMap, viewerMap);
   }
 
 }

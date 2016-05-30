@@ -16,7 +16,6 @@ package io.bonigarcia.webrtc;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -40,8 +39,9 @@ import org.kurento.test.latency.VideoTagType;
 
 public class WebRtcOne2ManyDockerTest extends FunctionalTest {
 
-  private static final int PLAYTIME_SEC = 10;
-  private static final int NUM_VIEWERS = 30;
+  private static final int PLAYTIME_INIT_SEC = 30;
+  private static final int PLAYTIME_END_SEC = 30;
+  private static final int NUM_VIEWERS = 20;
   private static final long VIEWERS_RATE_SEC = 1;
 
   @Parameters(name = "{index}: {0}")
@@ -84,11 +84,15 @@ public class WebRtcOne2ManyDockerTest extends FunctionalTest {
     getPresenter().startOcr();
     getViewer().startOcr();
 
+    // Play video (1 presenter and 1 viewer)
+    waitSeconds(PLAYTIME_INIT_SEC);
+
     // Docker clients
-    final ExecutorService service = Executors.newFixedThreadPool(NUM_VIEWERS - 1);
-    final CountDownLatch latch = new CountDownLatch(NUM_VIEWERS - 1);
-    WebRtcEndpoint[] dockerViewerWebRtcEP = new WebRtcEndpoint[NUM_VIEWERS - 1];
-    for (int i = 0; i < NUM_VIEWERS - 1; i++) {
+    int numDockerClients = NUM_VIEWERS - 1;
+    final ExecutorService service = Executors.newFixedThreadPool(numDockerClients);
+    final CountDownLatch latch = new CountDownLatch(numDockerClients);
+    WebRtcEndpoint[] dockerViewerWebRtcEP = new WebRtcEndpoint[numDockerClients];
+    for (int i = 0; i < numDockerClients; i++) {
       waitSeconds(VIEWERS_RATE_SEC);
       final int j = i;
       service.execute(new Runnable() {
@@ -97,11 +101,8 @@ public class WebRtcOne2ManyDockerTest extends FunctionalTest {
           dockerViewerWebRtcEP[j] = new WebRtcEndpoint.Builder(mp).build();
           presenterWebRtcEp.connect(dockerViewerWebRtcEP[j]);
           try {
-            getPage(j).setTimeout(120);
             getPage(j).initWebRtc(dockerViewerWebRtcEP[j], WebRtcChannel.AUDIO_AND_VIDEO,
                 WebRtcMode.RCV_ONLY);
-            getPage(j).subscribeEvents("playing");
-            getPage(j).waitForEvent("playing");
           } catch (InterruptedException e) {
             log.warn("InterruptedException on viewer {}", getPage(j).getBrowser().getId());
           } finally {
@@ -115,26 +116,29 @@ public class WebRtcOne2ManyDockerTest extends FunctionalTest {
     log.info("*** [Done]");
     service.shutdown();
 
-    // Play video
-    waitSeconds(PLAYTIME_SEC);
+    // Play video (N viewer)
+    waitSeconds(PLAYTIME_END_SEC);
 
     // Get OCR results and statistics
-    Map<String, String> presenterOcr = getPresenter().getOcr();
-    Map<String, String> viewerOcr = getViewer().getOcr();
-    List<Map<String, String>> presenterStats = getPresenter().getStatsList();
-    List<Map<String, String>> viewerStats = getViewer().getStatsList();
+    Map<String, Map<String, String>> presenterMap = getPresenter().getOcrMap();
+    Map<String, Map<String, String>> viewerMap = getViewer().getOcrMap();
 
-    // Finish OCR, close browser, release media pipeline
+    // Serialize data
+    serializeObject(presenterMap, "presenter.ser");
+    serializeObject(viewerMap, "viewer.ser");
+
+    // Finish OCR, close browser
     log.info("Finish OCR, close browser, release media pipeline");
     getPresenter().endOcr();
     getViewer().endOcr();
     getPresenter().close();
     getViewer().close();
-    mp.release();
 
     // Process data and write CSV
-    processOcrDataToCsv(this.getClass().getSimpleName() + ".csv", presenterOcr, viewerOcr,
-        presenterStats, viewerStats);
+    processDataToCsv(this.getClass().getSimpleName() + ".csv", presenterMap, viewerMap);
+
+    // Release media pipeline
+    mp.release();
   }
 
 }
