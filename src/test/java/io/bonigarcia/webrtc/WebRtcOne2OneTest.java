@@ -71,6 +71,10 @@ public class WebRtcOne2OneTest extends FunctionalTest {
     getPresenter().waitForEvent("playing");
     getViewer().waitForEvent("playing");
 
+    // Start recordings
+    getPresenter().startRecording("webRtcPeer.peerConnection.getLocalStreams()[0]");
+    getViewer().startRecording("webRtcPeer.peerConnection.getRemoteStreams()[0]");
+
     // Start OCR
     getPresenter().startOcr();
     getViewer().startOcr();
@@ -81,6 +85,14 @@ public class WebRtcOne2OneTest extends FunctionalTest {
     // Get OCR results and statistics
     Map<String, Map<String, String>> presenterMap = getPresenter().getOcrMap();
     Map<String, Map<String, String>> viewerMap = getViewer().getOcrMap();
+
+    // Stop recordings
+    getPresenter().stopRecording();
+    getViewer().stopRecording();
+
+    // Store recordings
+    getPresenter().getRecording("presenter.webm");
+    getViewer().getRecording("viewer.webm");
 
     // Serialize data
     serializeObject(presenterMap, "presenter.ser");
